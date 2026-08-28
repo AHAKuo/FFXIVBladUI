@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <Version>0.2.0.0</Version>
+    <Author>ahalwagdani</Author>
+    <Name>BladUI</Name>
+    <Punchline>Inventory UX upgrades: multiselect, ctrl+click quick-move, bulk operations.</Punchline>
+    <Description>An extension plugin that improves the UX of FFXIV inventory handling.
+Adds multiselect (click / ctrl+click / shift+click), ctrl+click to instantly move an item to the
+open saddlebag or retainer, and bulk move of all selected items. Multi-sell and drag support planned.</Description>
+    <Tags>inventory;ui;multiselect;quality-of-life</Tags>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+</Project>
