@@ -35,6 +35,22 @@ public static unsafe class InventoryService
         InventoryType.SaddleBag2,
     ];
 
+    public static readonly InventoryType[] ArmouryContainers =
+    [
+        InventoryType.ArmoryMainHand,
+        InventoryType.ArmoryOffHand,
+        InventoryType.ArmoryHead,
+        InventoryType.ArmoryBody,
+        InventoryType.ArmoryHands,
+        InventoryType.ArmoryLegs,
+        InventoryType.ArmoryFeets,
+        InventoryType.ArmoryEar,
+        InventoryType.ArmoryNeck,
+        InventoryType.ArmoryWrist,
+        InventoryType.ArmoryRings,
+        InventoryType.ArmorySoulCrystal,
+    ];
+
     public static readonly InventoryType[] RetainerPages =
     [
         InventoryType.RetainerPage1,
@@ -45,6 +61,26 @@ public static unsafe class InventoryService
         InventoryType.RetainerPage6,
         InventoryType.RetainerPage7,
     ];
+
+    /// <summary>
+    /// True while the given native addon (game window) exists and is visible.
+    /// Container data alone is NOT proof a window is open — the game caches
+    /// retainer/saddlebag contents after closing, and moving into a closed
+    /// container is an invalid request the server answers with a disconnect.
+    /// </summary>
+    public static bool IsAddonVisible(string name)
+    {
+        var addon = Plugin.GameGui.GetAddonByName(name);
+        return addon.Address != nint.Zero && addon.IsVisible;
+    }
+
+    /// <summary>Chocobo saddlebag window is actually open.</summary>
+    public static bool IsSaddlebagOpen()
+        => IsAddonVisible("InventoryBuddy") && AnyLoaded(SaddlebagPages);
+
+    /// <summary>A retainer's inventory window is actually open.</summary>
+    public static bool IsRetainerOpen()
+        => (IsAddonVisible("InventoryRetainer") || IsAddonVisible("InventoryRetainerLarge")) && AnyLoaded(RetainerPages);
 
     public static bool IsContainerLoaded(InventoryType type)
     {

@@ -44,7 +44,8 @@ public class MainWindow : Window, IDisposable
         uint ItemLevel,
         int Rarity,
         uint SellPrice,
-        string Description);
+        string Description,
+        InventoryType? Armoury);
 
     private readonly Plugin plugin;
     private readonly Dictionary<uint, ItemMeta> metaCache = [];
@@ -80,8 +81,10 @@ public class MainWindow : Window, IDisposable
             return;
         }
 
-        var saddlebagOpen = InventoryService.AnyLoaded(InventoryService.SaddlebagPages);
-        var retainerOpen = InventoryService.AnyLoaded(InventoryService.RetainerPages);
+        // Gate on the real game windows being open, not just cached container
+        // data — moving into a closed container is server-invalid.
+        var saddlebagOpen = InventoryService.IsSaddlebagOpen();
+        var retainerOpen = InventoryService.IsRetainerOpen();
 
         using var tabBar = ImRaii.TabBar("BladUITabs");
         if (!tabBar.Success)
@@ -96,8 +99,14 @@ public class MainWindow : Window, IDisposable
                     : saddlebagOpen
                         ? (InventoryService.SaddlebagPages, "Saddlebag")
                         : (null, string.Empty);
-                DrawContainerView("inv", InventoryService.PlayerBags, dest, destName);
+                DrawContainerView("inv", InventoryService.PlayerBags, dest, destName, offerArmoury: true);
             }
+        }
+
+        using (var tab = ImRaii.TabItem("Armoury"))
+        {
+            if (tab.Success)
+                DrawContainerView("armoury", InventoryService.ArmouryContainers, InventoryService.PlayerBags, "Inventory");
         }
 
         if (saddlebagOpen)
@@ -115,7 +124,7 @@ public class MainWindow : Window, IDisposable
         }
     }
 
-    private void DrawContainerView(string id, InventoryType[] sources, InventoryType[]? destination, string destinationName)
+    private void DrawContainerView(string id, InventoryType[] sources, InventoryType[]? destination, string destinationName, bool offerArmoury = false)
     {
         // Snapshot all slots of this view in physical slot order.
         var slots = new List<SlotInfo>();
@@ -128,7 +137,7 @@ public class MainWindow : Window, IDisposable
 
         var view = BuildView(slots);
 
-        DrawActionBar(slots, view, destination, destinationName);
+        DrawActionBar(slots, view, destination, destinationName, offerArmoury);
         DrawToolBar(slots);
         ImGui.Separator();
 
@@ -246,7 +255,7 @@ public class MainWindow : Window, IDisposable
 
     #region Toolbars
 
-    private void DrawActionBar(List<SlotInfo> slots, List<SlotInfo> view, InventoryType[]? destination, string destinationName)
+    private void DrawActionBar(List<SlotInfo> slots, List<SlotInfo> view, InventoryType[]? destination, string destinationName, bool offerArmoury = false)
     {
         var selectedHere = slots.Where(s => s.ItemId != 0 && selection.Contains(new SlotKey(s.Container, s.Slot))).ToList();
 
@@ -261,6 +270,20 @@ public class MainWindow : Window, IDisposable
 
         if (destination == null && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip("Open a retainer or the saddlebag to move items.");
+
+        if (offerArmoury)
+        {
+            var gear = selectedHere.Where(s => GetMeta(s.ItemId).Armoury != null).ToList();
+            ImGui.SameLine();
+            using (ImRaii.Disabled(gear.Count == 0))
+            {
+                if (ImGui.Button($"→ Armoury ({gear.Count})"))
+                    MoveSelectedToArmoury(gear);
+            }
+
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip("Sends each selected piece of gear to its correct armoury\nchest container (non-gear items are skipped).");
+        }
 
         ImGui.SameLine();
         if (ImGui.Button("Select all"))
@@ -576,7 +599,9 @@ public class MainWindow : Window, IDisposable
             ? InventoryService.PlayerBags
             : InventoryService.SaddlebagPages.Contains(reference.Container)
                 ? InventoryService.SaddlebagPages
-                : InventoryService.RetainerPages;
+                : InventoryService.ArmouryContainers.Contains(reference.Container)
+                    ? InventoryService.ArmouryContainers
+                    : InventoryService.RetainerPages;
 
         var result = new List<SlotInfo>();
         foreach (var container in sources)
@@ -728,6 +753,31 @@ public class MainWindow : Window, IDisposable
         Plugin.Log.Information(statusMessage);
     }
 
+    /// <summary>Send gear to its matching armoury container; callers pre-filter to Armoury != null.</summary>
+    private void MoveSelectedToArmoury(List<SlotInfo> gear)
+    {
+        var moved = 0;
+        var full = 0;
+        foreach (var item in gear)
+        {
+            var armoury = GetMeta(item.ItemId).Armoury!.Value;
+            if (InventoryService.MoveToFirstFree(new SlotKey(item.Container, item.Slot), [armoury]))
+            {
+                selection.Remove(new SlotKey(item.Container, item.Slot));
+                moved++;
+            }
+            else
+            {
+                full++; // That one armoury section is full; others may still work.
+            }
+        }
+
+        statusMessage = full == 0
+            ? $"Moved {moved} gear item(s) to the Armoury."
+            : $"Moved {moved} gear item(s) to the Armoury — {full} skipped (section full).";
+        Plugin.Log.Information(statusMessage);
+    }
+
     #endregion
 
     private ItemMeta GetMeta(uint itemId)
@@ -748,6 +798,27 @@ public class MainWindow : Window, IDisposable
                 catName = row.ItemUICategory.Value.Name.ExtractText();
             }
 
+            // Which armoury chest container this gear belongs in, if any.
+            // EquipSlotCategory fields: 1 = occupies the slot, -1 = blocks it.
+            InventoryType? armoury = null;
+            if (row.EquipSlotCategory.IsValid && row.EquipSlotCategory.RowId != 0)
+            {
+                var e = row.EquipSlotCategory.Value;
+                armoury = e.MainHand == 1 ? InventoryType.ArmoryMainHand
+                    : e.OffHand == 1 ? InventoryType.ArmoryOffHand
+                    : e.Head == 1 ? InventoryType.ArmoryHead
+                    : e.Body == 1 ? InventoryType.ArmoryBody
+                    : e.Gloves == 1 ? InventoryType.ArmoryHands
+                    : e.Legs == 1 ? InventoryType.ArmoryLegs
+                    : e.Feet == 1 ? InventoryType.ArmoryFeets
+                    : e.Ears == 1 ? InventoryType.ArmoryEar
+                    : e.Neck == 1 ? InventoryType.ArmoryNeck
+                    : e.Wrists == 1 ? InventoryType.ArmoryWrist
+                    : e.FingerL == 1 || e.FingerR == 1 ? InventoryType.ArmoryRings
+                    : e.SoulCrystal == 1 ? InventoryType.ArmorySoulCrystal
+                    : null;
+            }
+
             var name = row.Name.ExtractText();
             meta = new ItemMeta(
                 name,
@@ -760,11 +831,12 @@ public class MainWindow : Window, IDisposable
                 row.LevelItem.RowId,
                 row.Rarity,
                 row.PriceLow,
-                row.Description.ExtractText());
+                row.Description.ExtractText(),
+                armoury);
         }
         else
         {
-            meta = new ItemMeta($"Unknown item #{itemId}", $"unknown item #{itemId}", 0, 999, 999, 0, "Unknown", 0, 0, 0, string.Empty);
+            meta = new ItemMeta($"Unknown item #{itemId}", $"unknown item #{itemId}", 0, 999, 999, 0, "Unknown", 0, 0, 0, string.Empty, null);
         }
 
         metaCache[itemId] = meta;
