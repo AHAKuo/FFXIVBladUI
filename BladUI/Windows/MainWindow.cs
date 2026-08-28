@@ -33,22 +33,7 @@ public class MainWindow : Window, IDisposable
         "Slot order (game)",
     ];
 
-    private readonly record struct ItemMeta(
-        string Name,
-        string NameLower,
-        uint IconId,
-        int CategoryMajor,
-        int CategoryMinor,
-        int CategoryId,
-        string CategoryName,
-        uint ItemLevel,
-        int Rarity,
-        uint SellPrice,
-        string Description,
-        InventoryType? Armoury);
-
     private readonly Plugin plugin;
-    private readonly Dictionary<uint, ItemMeta> metaCache = [];
 
     private readonly HashSet<SlotKey> selection = [];
     private SlotKey? selectionAnchor;
@@ -56,6 +41,7 @@ public class MainWindow : Window, IDisposable
     private string searchText = string.Empty;
     private int categoryFilter = FilterAll;
     private List<uint>? dragKeys;
+    private Dictionary<uint, List<string>> gearsetItems = [];
 
     public MainWindow(Plugin plugin)
         : base("BladUI — Inventory###BladUIMain")
@@ -85,6 +71,8 @@ public class MainWindow : Window, IDisposable
         // data — moving into a closed container is server-invalid.
         var saddlebagOpen = InventoryService.IsSaddlebagOpen();
         var retainerOpen = InventoryService.IsRetainerOpen();
+
+        gearsetItems = InventoryService.GetGearsetItemKeys();
 
         using var tabBar = ImRaii.TabBar("BladUITabs");
         if (!tabBar.Success)
@@ -314,7 +302,13 @@ public class MainWindow : Window, IDisposable
         using (ImRaii.Disabled(true))
             ImGui.Button(waresCount > 0 ? $"Sell wares ({waresCount} · {waresGil:N0} gil)" : "Sell wares");
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            ImGui.SetTooltip("Coming in v0.3 — sell every marked ware to an open shop in one click.");
+            ImGui.SetTooltip("Coming soon — sell every marked ware to an open shop in one click.");
+
+        ImGui.SameLine();
+        if (ImGui.Button("Utilities…"))
+            plugin.ToggleUtilities();
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Bulk action profiles: clean armoury, mark garbage as wares, …");
     }
 
     private void DrawToolBar(List<SlotInfo> slots)
@@ -477,6 +471,27 @@ public class MainWindow : Window, IDisposable
                     drawList.AddCircle(badgeCenter, 5f, ImGui.GetColorU32(new Vector4(0.25f, 0.18f, 0.02f, 1f)), 0, 1.5f);
                 }
 
+                if (gearsetItems.ContainsKey(OrderKey(slot)))
+                {
+                    // Cyan diamond, bottom-left: part of a gear set.
+                    var c = pos + new Vector2(7f, cellSize.Y - 7f);
+                    const float r = 4.5f;
+                    var col = ImGui.GetColorU32(new Vector4(0.35f, 0.85f, 0.95f, 1f));
+                    drawList.AddQuadFilled(c + new Vector2(0, -r), c + new Vector2(r, 0), c + new Vector2(0, r), c + new Vector2(-r, 0), col);
+                    drawList.AddQuad(c + new Vector2(0, -r), c + new Vector2(r, 0), c + new Vector2(0, r), c + new Vector2(-r, 0),
+                        ImGui.GetColorU32(new Vector4(0.05f, 0.2f, 0.25f, 1f)), 1.2f);
+                }
+
+                // BG3-style double-click to use (bags only; the game enforces
+                // cooldowns, combat locks, etc. server-side).
+                if (hovered && meta.Usable
+                    && InventoryService.PlayerBags.Contains(slot.Container)
+                    && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                {
+                    InventoryService.UseItem(slot.ItemId, slot.IsHq);
+                    statusMessage = $"Used {meta.Name}.";
+                }
+
                 if (slot.Quantity > 1)
                 {
                     var qty = slot.Quantity.ToString();
@@ -532,6 +547,9 @@ public class MainWindow : Window, IDisposable
             ImGui.PopTextWrapPos();
         }
 
+        if (gearsetItems.TryGetValue(OrderKey(slot), out var setNames))
+            ImGui.TextColored(new Vector4(0.35f, 0.85f, 0.95f, 1f), $"Gear sets: {string.Join(", ", setNames)}");
+
         ImGui.Separator();
         ImGui.Text(meta.SellPrice > 0
             ? $"Sells for {meta.SellPrice:N0} gil{(slot.Quantity > 1 ? $" ({meta.SellPrice * (uint)slot.Quantity:N0} for the stack of {slot.Quantity})" : string.Empty)}"
@@ -543,6 +561,8 @@ public class MainWindow : Window, IDisposable
                 ? $"Ctrl+Click: move to {destinationName}"
                 : "Ctrl+Click: toggle selection");
         ImGui.TextDisabled("Shift+Click: range · Right-click: menu");
+        if (meta.Usable && InventoryService.PlayerBags.Contains(slot.Container))
+            ImGui.TextDisabled("Double-click: use");
         if (plugin.Configuration.SortMode == SortCustom)
             ImGui.TextDisabled("Drag: arrange your view");
     }
@@ -558,6 +578,42 @@ public class MainWindow : Window, IDisposable
 
         ImGui.TextColored(RarityColor(meta.Rarity), scopeLabel);
         ImGui.Separator();
+
+        var inBags = InventoryService.PlayerBags.Contains(slot.Container);
+        if (!actOnSelection && inBags && meta.Usable)
+        {
+            if (ImGui.MenuItem("Use"))
+            {
+                InventoryService.UseItem(slot.ItemId, slot.IsHq);
+                statusMessage = $"Used {meta.Name}.";
+            }
+
+            if (ImGui.BeginMenu("Add to hotbar"))
+            {
+                for (var bar = 0u; bar < 10u; bar++)
+                {
+                    if (!ImGui.BeginMenu($"Hotbar {bar + 1}"))
+                        continue;
+
+                    for (var hslot = 0u; hslot < 12u; hslot++)
+                    {
+                        var occupied = InventoryService.IsHotbarSlotOccupied(bar, hslot);
+                        if (ImGui.MenuItem($"Slot {hslot + 1}{(occupied ? " •" : string.Empty)}"))
+                        {
+                            statusMessage = InventoryService.SetHotbarSlot(bar, hslot, slot.ItemId, slot.IsHq)
+                                ? $"Put {meta.Name} on hotbar {bar + 1}, slot {hslot + 1}."
+                                : "Could not set hotbar slot.";
+                        }
+                    }
+
+                    ImGui.EndMenu();
+                }
+
+                ImGui.EndMenu();
+            }
+
+            ImGui.Separator();
+        }
 
         if (destination != null && ImGui.MenuItem($"Move to {destinationName}"))
         {
@@ -780,66 +836,5 @@ public class MainWindow : Window, IDisposable
 
     #endregion
 
-    private ItemMeta GetMeta(uint itemId)
-    {
-        if (metaCache.TryGetValue(itemId, out var cached))
-            return cached;
-
-        ItemMeta meta;
-        if (Plugin.DataManager.GetExcelSheet<Item>().TryGetRow(itemId, out var row))
-        {
-            var catMajor = 999;
-            var catMinor = 999;
-            var catName = "Miscellany";
-            if (row.ItemUICategory.IsValid && row.ItemUICategory.RowId != 0)
-            {
-                catMajor = row.ItemUICategory.Value.OrderMajor;
-                catMinor = row.ItemUICategory.Value.OrderMinor;
-                catName = row.ItemUICategory.Value.Name.ExtractText();
-            }
-
-            // Which armoury chest container this gear belongs in, if any.
-            // EquipSlotCategory fields: 1 = occupies the slot, -1 = blocks it.
-            InventoryType? armoury = null;
-            if (row.EquipSlotCategory.IsValid && row.EquipSlotCategory.RowId != 0)
-            {
-                var e = row.EquipSlotCategory.Value;
-                armoury = e.MainHand == 1 ? InventoryType.ArmoryMainHand
-                    : e.OffHand == 1 ? InventoryType.ArmoryOffHand
-                    : e.Head == 1 ? InventoryType.ArmoryHead
-                    : e.Body == 1 ? InventoryType.ArmoryBody
-                    : e.Gloves == 1 ? InventoryType.ArmoryHands
-                    : e.Legs == 1 ? InventoryType.ArmoryLegs
-                    : e.Feet == 1 ? InventoryType.ArmoryFeets
-                    : e.Ears == 1 ? InventoryType.ArmoryEar
-                    : e.Neck == 1 ? InventoryType.ArmoryNeck
-                    : e.Wrists == 1 ? InventoryType.ArmoryWrist
-                    : e.FingerL == 1 || e.FingerR == 1 ? InventoryType.ArmoryRings
-                    : e.SoulCrystal == 1 ? InventoryType.ArmorySoulCrystal
-                    : null;
-            }
-
-            var name = row.Name.ExtractText();
-            meta = new ItemMeta(
-                name,
-                name.ToLowerInvariant(),
-                row.Icon,
-                catMajor,
-                catMinor,
-                (int)row.ItemUICategory.RowId,
-                catName,
-                row.LevelItem.RowId,
-                row.Rarity,
-                row.PriceLow,
-                row.Description.ExtractText(),
-                armoury);
-        }
-        else
-        {
-            meta = new ItemMeta($"Unknown item #{itemId}", $"unknown item #{itemId}", 0, 999, 999, 0, "Unknown", 0, 0, 0, string.Empty, null);
-        }
-
-        metaCache[itemId] = meta;
-        return meta;
-    }
+    private static ItemMeta GetMeta(uint itemId) => ItemData.Get(itemId);
 }

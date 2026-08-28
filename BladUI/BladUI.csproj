@@ -1,14 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.2.2.0</Version>
-    <Author>ahalwagdani</Author>
+    <Version>0.3.0.0</Version>
+    <Author>AHAKuo</Author>
     <Name>BladUI</Name>
-    <Punchline>Inventory UX upgrades: multiselect, ctrl+click quick-move, bulk operations.</Punchline>
-    <Description>An extension plugin that improves the UX of FFXIV inventory handling.
-Adds multiselect (click / ctrl+click / shift+click), ctrl+click to instantly move an item to the
-open saddlebag or retainer, and bulk move of all selected items. Multi-sell and drag support planned.</Description>
-    <Tags>inventory;ui;multiselect;quality-of-life</Tags>
+    <Punchline>Baldur's Gate-style inventory: multiselect, bulk move, one-click armoury cleanup.</Punchline>
+    <Description>Your inventory, your way — a Baldur's Gate-style inventory window for FFXIV.
+
+• Multiselect: click, Ctrl+Click, Shift+Click ranges, Ctrl+A — then move everything in one click.
+• Your own layout: drag-arranged custom order that ignores the game's slot shuffle, plus sort by type, name, item level, rarity, and more, with search and category filters.
+• Rarity-colored tiles, rich tooltips, gearset badges, HQ marks.
+• Ctrl+Click instant move to the open retainer or saddlebag; send gear to its correct armoury slot.
+• Wares: mark your to-sell pile (with live market-vs-vendor comparison via universalis.app).
+• Utilities: reviewable bulk actions — clean out your armoury chest, auto-mark vendor trash — every step previewed before it runs.
+• Use items and assign hotbar slots from the window.
+
+Every action maps to a normal player click, validated by the game — BladUI saves clicks, never automates.</Description>
+    <Tags>inventory;bag;armoury;armory;saddlebag;retainer;sort;search;sell;wares;multiselect;move;gearset;quality-of-life;qol;ui</Tags>
+    <RepoUrl>https://github.com/AHAKuo/FFXIVBladUI</RepoUrl>
   </PropertyGroup>
   <PropertyGroup>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

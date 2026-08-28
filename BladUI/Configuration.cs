@@ -44,6 +44,12 @@ public class Configuration : IPluginConfiguration
     /// </summary>
     public List<uint> Wares { get; set; } = [];
 
+    // Clean Armoury rules.
+    public bool CleanUnderlevel { get; set; } = true;
+    public int CleanUnderlevelThreshold { get; set; } = 30;
+    public bool CleanUnequippable { get; set; } = true;
+    public bool CleanWhiteOnly { get; set; } = true;
+
     public void Save()
     {
         Plugin.PluginInterface.SavePluginConfig(this);

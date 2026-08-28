@@ -1,9 +1,21 @@
+<p align="center"><img src="images/icon.png" width="128" alt="BladUI"></p>
+
 # BladUI
 
 **A Baldur's Gate-style inventory for FFXIV.** BladUI is a Dalamud plugin that renders
 your inventory as its own view — arranged your way, with the multiselect, quick-move,
 and bulk operations the native UI doesn't offer. The name is a nod to Baldur's Gate,
 whose inventory UX this project chases.
+
+> Clean out your armoury chest, saddlebag, and bags in under a minute.
+
+## Screenshots
+
+<!-- TODO: capture in-game (see docs/release-checklist.md)
+![Main window](images/image1.png)
+![Utilities preview](images/image2.png)
+-->
+*Coming soon — main window, Utilities plan preview, wares marking.*
 
 ## Features
 
@@ -75,6 +87,11 @@ dotnet build BladUI\BladUI.csproj -c Release
 
 Output: `BladUI\bin\Release\BladUI.dll` (plus the generated manifest and `latest.zip`).
 
+## Installing
+
+Official Dalamud repository submission is in progress — once accepted, BladUI will
+appear in `/xlplugins` (testing track first). Until then, build from source below.
+
 ## Installing (dev plugin)
 
 1. In game: `/xlsettings` → **Experimental** tab.
@@ -93,3 +110,7 @@ Output: `BladUI\bin\Release\BladUI.dll` (plus the generated manifest and `latest
 - **Identity**: custom order and wares are keyed by item identity
   (`itemId << 1 | hqBit`), not bag slots — the game can shuffle stacks freely without
   disturbing your view.
+
+## License
+
+[AGPL-3.0](LICENSE). Developed with AI assistance (Claude Code).

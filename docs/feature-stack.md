@@ -20,30 +20,61 @@ click-saver routed through the game's own server-validated actions, never automa
 - [x] **v0.2.1** — Server-safety gate: destinations require the real game window
       (addon visible), not cached container data
 - [x] **v0.2.2** — Armoury chest tab + "→ Armoury" routing by equip slot
+- [x] **v0.2.3** — Gearset badges (cyan diamond + tooltip), Use items
+      (right-click / double-click, bags only), Add to hotbar (menu-based)
+
+- [x] **v0.3.0** — Utilities: bulk action profiles (plan → preview → confirm → run);
+      Clean Armoury (rule-based); Mark Garbage as Wares (universalis.app + heuristics)
 
 ## Next up
 
-- [ ] **v0.3 — Sell wares**: one click sells every marked ware to an open shop.
+- [ ] **Sell wares**: one click sells every marked ware to an open shop.
       Route: agent/addon callback on the open shop window; study QuickTransfer's
       vendor-sell for prior art. Gate hard on the shop addon being visible.
       Confirm dialog listing items + total gil before firing.
+- [ ] More utility profiles (the stack is designed to grow — new profile = one
+      class implementing IBulkAction)
 
 ## Toward full inventory replacement
 
 The end state: BladUI can do everything the native inventory windows do, so they
 never need to be opened.
 
-- [ ] **Use items** from BladUI (food, potions, materia, minions, orchestrion rolls)
-      — `AgentInventoryContext.UseItem`; respect cooldowns/combat lockouts (the game
-      rejects those anyway; grey the action out when known-invalid)
+- [x] **Use items** from BladUI — shipped v0.2.3 (right-click Use + double-click)
 - [ ] **Discard** from BladUI — with a confirm step; never bulk-discard without
       an itemized list shown first
 - [ ] **Equip** from BladUI — right-click → Equip for gear usable by current job
-- [ ] **Drag to hotbar** — assign usable items to hotbar slots
-      (`RaptureHotbarModule` slot assignment)
+- [x] **Hotbar assignment** (menu-based) — shipped v0.2.3
+- [ ] **True drag to native hotbar** — drop BladUI items directly onto the game's
+      hotbar (needs cross-UI drag handling)
 - [ ] **Split stacks** — right-click → split with a quantity slider (BG3-style)
 - [ ] **Auto-open/replace**: option to open BladUI whenever the native inventory
       would open (and optionally suppress the native window)
+
+## Idea pool (suggested, not yet scheduled)
+
+Quick wins:
+- [ ] **Merge split stacks** profile — combine partial stacks of the same item
+      (MoveItemSlot onto a matching stack merges natively); footer hint for slots freed
+- [ ] **Spiritbond & condition surfacing** — flag 100% spiritbond (materia ready,
+      + extraction list profile) and low-durability gear on tiles
+- [ ] **Unopened coffers highlight** — glow/filter for coffers; double-click-use chains
+- [ ] **Gearset integrity check** profile — find set pieces stranded in bags/saddlebag,
+      one-click send to armoury
+- [ ] **"NEW" badges** — session-diff tag on items acquired since last open
+
+Medium:
+- [ ] **Treasure detector** — badge items whose market value dwarfs vendor price
+      (reuses cached Universalis data); safety net for Mark Garbage
+- [ ] **Saddlebag stash profile** — rules-based bulk stash of overflow (mats yes,
+      wares no, gearsets never) when saddlebag is open
+- [ ] **Custom view sections** — named collapsible dividers in the Custom arrangement
+
+Bigger:
+- [ ] **Cross-storage search** — one search over bags + armoury + saddlebag +
+      cached retainer data, showing item location (read-only, server-safe)
+- [ ] **Consolidate with retainer** — when open, highlight bag items with existing
+      retainer stacks; one-click top-up
 
 ## Backlog / ideas
 
@@ -53,7 +84,8 @@ never need to be opened.
 - [ ] Wares presets / junk rules (e.g. auto-mark grey-quality drops below ilvl X)
 - [ ] Crystal/currency strip
 - [ ] Per-tab or per-character custom arrangements
-- [ ] Gear-set awareness (warn before selling/discarding items in a gear set)
+- [x] Gear-set badges/tooltip — shipped v0.2.3
+- [ ] Gear-set protection (warn before selling/discarding items in a gear set)
 - [ ] Optional weight-style stats in footer (total wares gil, unique items count)
 
 ## Technical notes
